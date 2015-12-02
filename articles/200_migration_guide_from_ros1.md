@@ -51,17 +51,16 @@ Also some naming conventions are stricter then in ROS 1.
 
 The build system in ROS 2 is called [ament](http://design.ros2.org/articles/ament.html).
 
-
 #### Build tool
 
 Instead of using `catkin_make`, `catkin_make_isolated` or `catkin build` ROS 2 uses the command line tool [ament build](https://github.com/ament/ament_tools) to build and install a set of packages.
-
 
 #### Pure Python package
 
 If the ROS 1 package uses CMake only to invoke the `setup.py` file and does not contain anything beside Python code (e.g. also no messages, services, etc.) it should be converted into a pure Python package in ROS 2:
 
-* Update the build type in the `package.xml` file:
+* Update or the build type in the `package.xml` file:
+
 
     <export>
       <build_type>ament_python</build_type>
@@ -78,13 +77,15 @@ While each package can choose to also support Python 2 it must invoke executable
 
 Apply the following changes to use `ament_cmake` instead of `catkin`:
 
-* Set the build type in the `package.xml` file:
+* Set the build type in the `package.xml` file export section:
+
 
     <export>
       <build_type>ament_cmake</build_type>
     </export>
 
 * Replace the `find_package` invocation with `catkin` and the `COMPONENTS` with:
+
 
     find_package(ament_cmake REQUIRED)
     find_package(component1 REQUIRED)
@@ -101,6 +102,17 @@ Apply the following changes to use `ament_cmake` instead of `catkin`:
   * The `CATKIN_DEPENDS` and `DEPENDS` arguments are passed to the new function [ament_export_dependencies](https://github.com/ament/ament_cmake/blob/master/ament_cmake_export_dependencies/cmake/ament_export_dependencies.cmake).
 
 * Replace the invocation of `add_message_files`, `add_service_files` and `generate_messages` with [rosidl_generate_interfaces](https://github.com/ros2/rosidl/blob/master/rosidl_cmake/cmake/rosidl_generate_interfaces.cmake).
+
+  * The first argument is the `${PROJECT_NAME}`
+  * Followed by the list of message filenames, relative to the package root.
+    * It is recommended to compose a list of message files and pass the list to the function for clarity.
+  * The `DEPENDENCIES` argument from `generate_messages` is passed at the end.
+
+
+    rosidl_generate_interfaces(${PROJECT_NAME}
+      ${msg_files}
+      DEPENDENCIES std_msgs
+    )
 
 * Remove any occurrences of the *devel space*.
   Related CMake variables like `CATKIN_DEVEL_PREFIX` do not exist anymore.
@@ -121,6 +133,25 @@ Apply the following changes to use `ament_cmake` instead of `catkin`:
 * Replace ROS 1 dependencies like `roscpp` with ROS 2 dependencies like `rclcpp`.
   Using `rclcpp` will also require to link explicitly against one rmw implementation, commonly the default is provided by the [rmw_implementation](https://github.com/ros2/rmw_implementation/tree/master/rmw_implementation) package.
 
+#### Unit tests
+
+If you are using gtest
+
+* replace `CATKIN_ENABLE_TESTING` with `AMENT_ENABLE_TESTING`
+* replace `catkin_add_gtest` with `ament_add_gtest`
+* add a `<test_depend>ament_cmake_gtest</test_depend>`
+*
+
+It is recommended to turn on the automatic linter unittests by adding these lines just below `if(AMENT_ENABLE_TESTING)`:
+
+
+    find_package(ament_lint_auto REQUIRED)
+    ament_lint_auto_find_test_dependencies()
+
+You will also need to add the following dependencies to your `package.xml`:
+
+    <test_depend>ament_lint_auto</test_depend>
+    <test_depend>ament_lint_common</test_depend>
 
 #### Continue to use `catkin` in CMake
 
@@ -145,6 +176,22 @@ Shared pointer types are provided as typedefs within the message structs: `my_in
 
 For more details please see the article about the [generated C++ interfaces](http://design.ros2.org/articles/generated_interfaces_cpp.html).
 
+The migration requires includes to change by:
+
+* add `/msg` to the pathbefore the message datatype
+* Change the message name from CamelCase to underscore separation
+* Change from `*.h` to `*.hpp`
+
+The migration requires code to insert the `msg` namespace into all instances.
+
+For usages of `ros::TIme`:
+
+* replace all instances of `ros::Time` with `builtin_interfaces::msg::Time`
+* Convert all instances of `nsec` to `nanosec`
+* Convert all single argument double constructors to bare constructor + assignment
+
+Field values do not get initialized to zero when set.
+You must make sure to set all values instead of relying on them to be zero.
 
 #### ROS client library
 
@@ -152,6 +199,47 @@ For more details please see the article about the [generated C++ interfaces](htt
 NOTE: to be written
 </div>
 
+#### Boost
+
+Much of the functionality previously used in boost has been integrated into C++11.
+As such we would like to take advantage of the new core features and drop the dependency on boost.
+
+##### Shared Pointers
+
+To switch shared pointers from boost to c++11 replace instances of:
+* `#include <boost/shared_ptr.hpp` with `<memory>` 
+* `boost::shared_ptr` with `std::shared_ptr`
+
+There may also be variants such as `weak_ptr` which you want to convert as well. 
+
+Also it was recommended practice to use `using` intead of `typedef`.
+`using` has the ability to work better in templated logic.
+For details [see here](https://stackoverflow.com/questions/10747810/what-is-the-difference-between-typedef-and-using-in-c11)
+
+##### Thread/Mutexes
+
+Another common part of boost used in ROS codebases is mutexes in `boost::thread`.
+
+* Replace `boost::mutex::scoped_lock` with `std::unique_lock<std::mutex>`
+* Replace `boost::mutex` with `std::mutex`
+* Replace `#include <boost/thread/mutex.hpp>` with `#include <mutex>`
+
+
+##### Unordered Map
+
+Unordred map is not part of std. 
+
+Replace:
+
+* `#include <boost/unordered_map.hpp>` with `#include <unordered_map>`
+* `boost::unordered_map` with `std::unordered_map`
+
+##### function
+
+Replace:
+
+* `#include <boost/function.hpp>`  with `#include <functional>`
+* `boost::function` with `std::function`
 
 ## Launch files
 
@@ -217,7 +305,7 @@ roscore
 In another shell, we run the node from the `catkin` install space using
 `rosrun`, again sourcing the setup file first (in this case it must be the one
 from our workspace):
- 
+
 ~~~
 . ~/ros1_talker/install/setup.bash
 rosrun talker talker
