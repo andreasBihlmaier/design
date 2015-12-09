@@ -46,6 +46,19 @@ These files might need to be updated to comply with the [ROS Interface definitio
 Some primitive types have been removed and the types `duration` and `time` which were builtin types in ROS 1 have been replaced with normal message definitions and must be used from the `builtin_interfaces` package.
 Also some naming conventions are stricter then in ROS 1.
 
+In your `package.xml` you will need to add:
+
+* `<buildtool_depend>rosidl_default_generators</buildtool_depend>`
+* `<exec_depend>rosidl_default_runtime</exec_depend>`
+* For each dependent message package add `<depend>message_package</depend>`
+
+In your `CMakeLists.txt`:
+
+* `find_package(rosidl_default_generators REQUIRED)`
+* For each dependent message package add `find_package(message_package REQUIRED)`
+And replace the cmake function call to `generate_messages` with `rosidl_generate_interfaces`
+
+This will usurp `add_message_files` and `add_service_files` listing of all the message and service files, which can be removed.
 
 ### Build system
 
