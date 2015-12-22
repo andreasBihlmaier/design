@@ -160,15 +160,13 @@ If you are using gtest
 * replace `CATKIN_ENABLE_TESTING` with `AMENT_ENABLE_TESTING`
 * replace `catkin_add_gtest` with `ament_add_gtest`
 * add a `<test_depend>ament_cmake_gtest</test_depend>`
-*
 
 ##### Linters
 
 In ROS 2.0 we are working to maintain clean code using linters.
 The styles for different languages are defined in our [Developer Guide](https://github.com/ros2/ros2/wiki/Developer-Guide).
 
-If you are starting a project from scratch it is recommended to follow the style guide and turn on the automatic linter unittests by adding these lines just below `if(AMENT_ENABLE_TESTING)`:
-
+If you are starting a project from scratch it is recommended to follow the style guide and turn on the automatic linter unittests by adding these lines just below `if(AMENT_ENABLE_TESTING)`
 
     find_package(ament_lint_auto REQUIRED)
     ament_lint_auto_find_test_dependencies()
@@ -211,9 +209,11 @@ The migration requires code to insert the `msg` namespace into all instances.
 
 
 #### Usages of ros::Time
-TODO(tfoote) There is no direct replacement for ros::Time yet
+*TODO(tfoote) There is no direct replacement for ros::Time yet we expect to have one in the future.*
 
-For usages of `ros::Time`:
+Under the hood we expect to leverage the cross platform `std::chrono` library.
+
+Currently for usages of `ros::Time`:
 
 * replace all instances of `ros::Time` with `builtin_interfaces::msg::Time`
 * Convert all instances of `nsec` to `nanosec`
@@ -221,6 +221,12 @@ For usages of `ros::Time`:
 
 Field values do not get initialized to zero when constructed.
 You must make sure to set all values instead of relying on them to be zero.
+
+Alternatively you can switch to an internal proxy datatype temporarily while waiting for an rclcpp::Time
+
+#### Usages of ros::Rate
+
+There is an equivalent type `rclcpp::rate::Rate` object which is basically a drop in replacement for `ros::Rate`.
 
 #### ROS client library
 
