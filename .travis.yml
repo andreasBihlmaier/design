@@ -1,7 +1,7 @@
 language: ruby
 rvm:
 - 2.1
-install: gem install jekyll
+install: gem install jekyll jekyll-sitemap json pygments.rb --no-rdoc --no-ri
 script: jekyll build
 
 # branch whitelist
