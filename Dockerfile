@@ -13,10 +13,14 @@ RUN apt-get install -q -y nodejs
 
 RUN make --version
 
-RUN gem install jekyll jekyll-sitemap --no-rdoc --no-ri
+# make sure we have bundler
+RUN gem install bundler --no-rdoc --no-ri
+
+# install these in the image. bundler would bring them in but this will cache them
+RUN gem install jekyll jekyll-sitemap json pygments.rb --no-rdoc --no-ri
 
 EXPOSE 4000
 VOLUME /tmp/jekyll
 WORKDIR /tmp/jekyll
 
-CMD jekyll serve -w --baseurl='' -d /tmp/_site
+CMD bundle install && jekyll serve -w --baseurl='' -d /tmp/_site
