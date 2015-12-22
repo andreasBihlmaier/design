@@ -54,6 +54,13 @@ In your `package.xml` you will need to add:
 
 In your `CMakeLists.txt`:
 
+Start by enablign c++11
+
+    if(NOT WIN32)
+      add_definitions(-std=c++11)
+    endif()
+
+
 * `find_package(rosidl_default_generators REQUIRED)`
 * For each dependent message package add `find_package(message_package REQUIRED)`
 And replace the cmake function call to `generate_messages` with `rosidl_generate_interfaces`
@@ -72,8 +79,7 @@ Instead of using `catkin_make`, `catkin_make_isolated` or `catkin build` ROS 2 u
 
 If the ROS 1 package uses CMake only to invoke the `setup.py` file and does not contain anything beside Python code (e.g. also no messages, services, etc.) it should be converted into a pure Python package in ROS 2:
 
-* Update or the build type in the `package.xml` file:
-
+* Update or add the build type in the `package.xml` file:
 
     <export>
       <build_type>ament_python</build_type>
@@ -91,7 +97,6 @@ While each package can choose to also support Python 2 it must invoke executable
 Apply the following changes to use `ament_cmake` instead of `catkin`:
 
 * Set the build type in the `package.xml` file export section:
-
 
     <export>
       <build_type>ament_cmake</build_type>
@@ -114,13 +119,15 @@ Apply the following changes to use `ament_cmake` instead of `catkin`:
   * The `LIBRARIES` arguments are passed to the new functions [ament_export_libraries](https://github.com/ament/ament_cmake/blob/master/ament_cmake_export_libraries/cmake/ament_export_libraries.cmake) if the libraries are targets or [ament_export_library_names](https://github.com/ament/ament_cmake/blob/master/ament_cmake_export_libraries/cmake/ament_export_library_names.cmake) if the library is only identified by the name.
   * The `CATKIN_DEPENDS` and `DEPENDS` arguments are passed to the new function [ament_export_dependencies](https://github.com/ament/ament_cmake/blob/master/ament_cmake_export_dependencies/cmake/ament_export_dependencies.cmake).
 
+TODO(tfoote) document ament_export_interfaces?
+
+
 * Replace the invocation of `add_message_files`, `add_service_files` and `generate_messages` with [rosidl_generate_interfaces](https://github.com/ros2/rosidl/blob/master/rosidl_cmake/cmake/rosidl_generate_interfaces.cmake).
 
-  * The first argument is the `${PROJECT_NAME}`
+  * The first argument is the `target_name`. If you're building just one library it's `${PROJECT_NAME}`
   * Followed by the list of message filenames, relative to the package root.
-    * It is recommended to compose a list of message files and pass the list to the function for clarity.
-  * The `DEPENDENCIES` argument from `generate_messages` is passed at the end.
-
+    * If you will be using the list of filenames multiple times, it is recommended to compose a list of message files and pass the list to the function for clarity.
+  * The final multi-value-keyword argument fpr `generate_messages` is `DEPENDENCIES` which requires the list of dependent message packages.
 
     rosidl_generate_interfaces(${PROJECT_NAME}
       ${msg_files}
@@ -138,7 +145,7 @@ Apply the following changes to use `ament_cmake` instead of `catkin`:
   * `CATKIN_GLOBAL_LIBEXEC_DESTINATION`: `lib`
   * `CATKIN_GLOBAL_SHARE_DESTINATION`: `share`
 
-  * `CATKIN_PACKAGE_BIN_DESTINATION`: `lib/${PROJECT_NAME}`
+  * `CATKIN_PACKAGE_BIN_DESTINATION`: `bin/${PROJECT_NAME}`
   * `CATKIN_PACKAGE_INCLUDE_DESTINATION`: `include/${PROJECT_NAME}`
   * `CATKIN_PACKAGE_LIB_DESTINATION`: `lib`
   * `CATKIN_PACKAGE_SHARE_DESTINATION`: `share/${PROJECT_NAME}`
@@ -155,7 +162,12 @@ If you are using gtest
 * add a `<test_depend>ament_cmake_gtest</test_depend>`
 *
 
-It is recommended to turn on the automatic linter unittests by adding these lines just below `if(AMENT_ENABLE_TESTING)`:
+##### Linters
+
+In ROS 2.0 we are working to maintain clean code using linters.
+The styles for different languages are defined in our [Developer Guide](https://github.com/ros2/ros2/wiki/Developer-Guide).
+
+If you are starting a project from scratch it is recommended to follow the style guide and turn on the automatic linter unittests by adding these lines just below `if(AMENT_ENABLE_TESTING)`:
 
 
     find_package(ament_lint_auto REQUIRED)
@@ -191,19 +203,23 @@ For more details please see the article about the [generated C++ interfaces](htt
 
 The migration requires includes to change by:
 
-* add `/msg` to the pathbefore the message datatype
-* Change the message name from CamelCase to underscore separation
+* insert the subfolder `msg` between the package name and message datatype
+* Change the included filename from CamelCase to underscore separation
 * Change from `*.h` to `*.hpp`
 
 The migration requires code to insert the `msg` namespace into all instances.
 
-For usages of `ros::TIme`:
+
+#### Usages of ros::Time
+TODO(tfoote) There is no direct replacement for ros::Time yet
+
+For usages of `ros::Time`:
 
 * replace all instances of `ros::Time` with `builtin_interfaces::msg::Time`
 * Convert all instances of `nsec` to `nanosec`
 * Convert all single argument double constructors to bare constructor + assignment
 
-Field values do not get initialized to zero when set.
+Field values do not get initialized to zero when constructed.
 You must make sure to set all values instead of relying on them to be zero.
 
 #### ROS client library
@@ -214,18 +230,18 @@ NOTE: to be written
 
 #### Boost
 
-Much of the functionality previously used in boost has been integrated into C++11.
-As such we would like to take advantage of the new core features and drop the dependency on boost.
+Much of the functionality previously provided by Boost has been integrated into C++11.
+As such we would like to take advantage of the new core features and avoid the dependency on boost where possible.
 
 ##### Shared Pointers
 
 To switch shared pointers from boost to c++11 replace instances of:
-* `#include <boost/shared_ptr.hpp` with `<memory>` 
+* `#include <boost/shared_ptr.hpp` with `<memory>`
 * `boost::shared_ptr` with `std::shared_ptr`
 
-There may also be variants such as `weak_ptr` which you want to convert as well. 
+There may also be variants such as `weak_ptr` which you want to convert as well.
 
-Also it was recommended practice to use `using` intead of `typedef`.
+Also it recommended practice to use `using` intead of `typedef`.
 `using` has the ability to work better in templated logic.
 For details [see here](https://stackoverflow.com/questions/10747810/what-is-the-difference-between-typedef-and-using-in-c11)
 
@@ -239,8 +255,6 @@ Another common part of boost used in ROS codebases is mutexes in `boost::thread`
 
 
 ##### Unordered Map
-
-Unordred map is not part of std. 
 
 Replace:
 
